@@ -35,7 +35,7 @@ native function CallObjectMethodSync();
 Window.prototype.on = Window.prototype.addListener = function(ev, callback) {
   // Save window id of where the callback is created.
   var closure = v8_util.getCreationContext(callback);
-  if (v8_util.getConstructorName(closure) == 'Window' && 
+  if (v8_util.getConstructorName(closure) == 'Window' &&
       closure.hasOwnProperty('nwDispatcher')) {
     v8_util.setHiddenValue(callback, '__nwWindowId',
         closure.nwDispatcher.requireNwGui().Window.get().id);
@@ -52,7 +52,7 @@ Window.prototype.handleEvent = function(ev) {
   for (var i = 0; i < listeners_copy.length; ++i) {
     var original_closure = v8_util.getCreationContext(listeners_copy[i]);
 
-    // Skip for node context. 
+    // Skip for node context.
     if (v8_util.getConstructorName(original_closure) != 'Window')
       continue;
 
@@ -143,6 +143,10 @@ Window.prototype.__defineGetter__('zoomLevel', function() {
 });
 
 Window.prototype.__defineSetter__('menu', function(menu) {
+  if(!menu) {
+    CallObjectMethod(this, "ClearMenu", []);
+    return;
+  }
   if (v8_util.getConstructorName(menu) != 'Menu')
     throw new String("'menu' property requries a valid Menu");
 

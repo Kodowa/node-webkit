@@ -414,6 +414,10 @@ void NativeWindowWin::SetMenu(api::Menu* menu) {
   ::SetMenu(window_->GetNativeWindow(), menu->menu_->GetNativeMenu());
 }
 
+void NativeWindowWin::ClearMenu() {
+  window_->set_has_menu_bar(false);
+}
+
 void NativeWindowWin::SetTitle(const std::string& title) {
   title_ = title;
   window_->UpdateWindowTitle();
