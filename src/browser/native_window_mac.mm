@@ -611,7 +611,12 @@ bool NativeWindowCocoa::IsKiosk() {
 }
 
 void NativeWindowCocoa::SetMenu(api::Menu* menu) {
-  [NSApp setMainMenu:menu->menu_];
+  if(menu == nil) {
+    NSMenu *menu = [[NSMenu alloc] initWithTitle:@""];
+    [NSApp setMainMenu:menu];
+  } else {
+    [NSApp setMainMenu:menu->menu_];
+  }
 }
 
 void NativeWindowCocoa::ClearMenu() {
