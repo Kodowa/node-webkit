@@ -246,7 +246,10 @@ NativeWindowWin::NativeWindowWin(const base::WeakPtr<content::Shell>& shell,
       menu_(NULL),
       resizable_(true),
       minimum_size_(0, 0),
-      maximum_size_() {
+      maximum_size_(),
+      initial_focus_(true) {
+  manifest->GetBoolean("focus", &initial_focus_);
+
   window_ = new views::Widget;
   views::Widget::InitParams params(views::Widget::InitParams::TYPE_WINDOW);
   params.delegate = this;
@@ -287,9 +290,13 @@ void NativeWindowWin::Focus(bool focus) {
 }
 
 void NativeWindowWin::Show() {
+  VLOG(1) << "NativeWindowWin::Show(); initial_focus = " << initial_focus_;
   if (is_maximized_)
     window_->native_widget_private()->ShowWithWindowState(ui::SHOW_STATE_MAXIMIZED);
-  else
+  else if (!initial_focus_) {
+    window_->set_focus_on_creation(false);
+    window_->native_widget_private()->ShowWithWindowState(ui::SHOW_STATE_INACTIVE);
+  } else
     window_->native_widget_private()->Show();
 }
 
@@ -608,6 +615,10 @@ void NativeWindowWin::OnFocus() {
   web_view_->RequestFocus();
 }
 
+void NativeWindowWin::SetInitialFocus(bool initial_focus) {
+  initial_focus_ = initial_focus;
+}
+
 bool NativeWindowWin::ExecuteWindowsCommand(int command_id) {
   // Windows uses the 4 lower order bits of |command_id| for type-specific
   // information so we must exclude this when comparing.
@@ -661,11 +672,11 @@ void NativeWindowWin::OnViewWasResized() {
                1);
 
   SkRegion* rgn = new SkRegion;
-  if (!window_->IsFullscreen() && !window_->IsMaximized()) {
+  if (!window_->IsFullscreen()) {
     if (draggable_region())
       rgn->op(*draggable_region(), SkRegion::kUnion_Op);
 
-    if (!has_frame() && CanResize()) {
+    if (!has_frame() && CanResize() && !window_->IsMaximized()) {
       rgn->op(0, 0, width, kResizeInsideBoundsSize, SkRegion::kUnion_Op);
       rgn->op(0, 0, kResizeInsideBoundsSize, height, SkRegion::kUnion_Op);
       rgn->op(width - kResizeInsideBoundsSize, 0, width, height,

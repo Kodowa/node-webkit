@@ -168,6 +168,11 @@ Window.prototype.__defineSetter__('isFullscreen', function(flag) {
     this.leaveFullscreen();
 });
 
+Window.prototype.isDevToolsOpen = function () {
+    var result = CallObjectMethodSync(this, 'IsDevToolsOpen', []);
+    return Boolean(result[0]);
+}
+
 Window.prototype.__defineGetter__('isFullscreen', function() {
   var result = CallObjectMethodSync(this, 'IsFullscreen', []);
   return Boolean(result[0]);
@@ -273,10 +278,15 @@ Window.prototype.toggleKioskMode = function() {
   CallObjectMethod(this, 'ToggleKioskMode', []);
 }
 
+Window.prototype.closeDevTools = function() {
+  CallObjectMethod(this, 'CloseDevTools', []);
+}
+
 Window.prototype.showDevTools = function(frm, headless) {
     var id = '';
     if (typeof frm === 'string') {
         id = frm;
+        this._pending_devtools_jail = null;
     }else{
         this._pending_devtools_jail = frm;
     }

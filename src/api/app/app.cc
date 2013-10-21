@@ -22,9 +22,10 @@
 
 #include "base/command_line.h"
 #include "base/logging.h"
-#include "base/message_loop.h"
+#include "base/message_loop/message_loop.h"
 #include "base/values.h"
 #include "content/nw/src/api/api_messages.h"
+#include "content/nw/src/breakpad_linux.h"
 #include "content/nw/src/browser/native_window.h"
 #include "content/nw/src/browser/net_disk_cache_remover.h"
 #include "content/nw/src/nw_package.h"
@@ -79,6 +80,9 @@ void App::Call(const std::string& method,
   } else if (method == "CloseAllWindows") {
     CloseAllWindows();
     return;
+  } else if (method == "CrashBrowser") {
+    int* ptr = NULL;
+    *ptr = 1;
   }
   NOTREACHED() << "Calling unknown method " << method << " of App";
 }
@@ -116,6 +120,11 @@ void App::Call(Shell* shell,
     ClearCache(GetRenderProcessHost());
   } else if (method == "GetPackage") {
     result->AppendString(shell->GetPackage()->package_string());
+    return;
+  } else if (method == "SetCrashDumpDir") {
+    std::string path;
+    arguments.GetString(0, &path);
+    result->AppendBoolean(SetCrashDumpPath(path.c_str()));
     return;
   }
 
@@ -183,6 +192,20 @@ void App::EmitOpenEvent(const std::string& path) {
     DCHECK(rph != NULL);
 
     rph->Send(new ShellViewMsg_Open(path));
+  }
+}
+
+// static
+void App::EmitReopenEvent() {
+  std::set<RenderProcessHost*> rphs;
+  std::set<RenderProcessHost*>::iterator it;
+
+  GetRenderProcessHosts(rphs);
+  for (it = rphs.begin(); it != rphs.end(); it++) {
+    RenderProcessHost* rph = *it;
+    DCHECK(rph != NULL);
+
+    rph->Send(new ShellViewMsg_Reopen());
   }
 }
 

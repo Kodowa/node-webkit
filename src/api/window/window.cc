@@ -84,7 +84,9 @@ void Window::Call(const std::string& method,
     arguments.GetString(0, &jail_id);
     arguments.GetBoolean(1, &headless);
     shell_->ShowDevTools(jail_id.c_str(), headless);
-  } else if (method == "ResizeTo") {
+  } else if (method == "CloseDevTools") {
+    shell_->CloseDevTools();
+  }else if (method == "ResizeTo") {
     int width, height;
     if (arguments.GetInteger(0, &width) &&
         arguments.GetInteger(1, &height))
@@ -151,6 +153,8 @@ void Window::CallSync(const std::string& method,
     gfx::Point position = shell_->window()->GetPosition();
     result->AppendInteger(position.x());
     result->AppendInteger(position.y());
+  } else if (method == "IsDevToolsOpen") {
+    result->AppendBoolean(shell_->devToolsOpen());
   } else {
     NOTREACHED() << "Invalid call to Window method:" << method
                  << " arguments:" << arguments;

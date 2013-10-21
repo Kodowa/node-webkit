@@ -26,8 +26,10 @@
 #include "base/files/file_path.h"
 #include "base/file_util.h"
 #include "base/logging.h"
+#include "base/posix/global_descriptors.h"
 #include "base/strings/string16.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/autofill/content/renderer/page_click_tracker.h"
 #include "content/nw/src/api/dispatcher.h"
@@ -38,6 +40,7 @@
 #include "content/nw/src/nw_version.h"
 #include "components/autofill/content/renderer/autofill_agent.h"
 #include "components/autofill/content/renderer/password_autofill_agent.h"
+#include "content/nw/src/renderer/autofill_agent.h"
 #include "content/nw/src/renderer/nw_render_view_observer.h"
 #include "content/nw/src/renderer/prerenderer/prerenderer_client.h"
 #include "content/nw/src/renderer/printing/print_web_view_helper.h"
@@ -45,6 +48,7 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/renderer/render_view.h"
 #include "content/renderer/render_view_impl.h"
+#include "ipc/ipc_descriptors.h"
 #include "net/proxy/proxy_bypass_rules.h"
 #include "third_party/node/src/node.h"
 #include "third_party/node/src/req_wrap.h"
@@ -54,7 +58,7 @@
 #include "third_party/WebKit/public/web/WebSecurityPolicy.h"
 #include "third_party/WebKit/public/web/WebView.h"
 //#include "third_party/WebKit/Source/WebKit/chromium/public/platform/WebString.h"
-#include "webkit/common/dom_storage/dom_storage_map.h"
+#include "content/common/dom_storage/dom_storage_map.h"
 
 using content::RenderView;
 using content::RenderViewImpl;
@@ -125,7 +129,7 @@ void ShellContentRendererClient::RenderThreadStarted() {
     std::string quota_str = command_line->GetSwitchValueASCII(switches::kDomStorageQuota);
     int quota = 0;
     if (base::StringToInt(quota_str, &quota) && quota > 0) {
-      dom_storage::DomStorageMap::SetQuotaOverride(quota * 1024 * 1024);
+      content::DOMStorageMap::SetQuotaOverride(quota * 1024 * 1024);
     }
   }
   // Initialize node after render thread is started.
@@ -152,6 +156,15 @@ void ShellContentRendererClient::RenderThreadStarted() {
   // Setup node.js.
   node::SetupContext(argc, argv, node::g_context->Global());
 
+#if !defined(OS_WIN)
+  v8::Local<v8::Script> script = v8::Script::New(v8::String::New((
+      "process.__nwfds_to_close = [" +
+      base::StringPrintf("%d", base::GlobalDescriptors::GetInstance()->Get(kPrimaryIPCChannel)) +
+      "];"
+    ).c_str()));
+  CHECK(*script);
+  script->Run();
+#endif
   // Start observers.
   shell_observer_.reset(new ShellRenderProcessObserver());
 
@@ -171,11 +184,11 @@ void ShellContentRendererClient::RenderViewCreated(RenderView* render_view) {
   new printing::PrintWebViewHelper(render_view);
 #endif
 
-  // PageClickTracker* page_click_tracker = new PageClickTracker(render_view);
-  PasswordAutofillAgent* password_autofill_agent =
-      new PasswordAutofillAgent(render_view);
-  new AutofillAgent(render_view, password_autofill_agent);
-  //page_click_tracker->AddListener(autofill_agent);
+  nw::AutofillAgent* autofill_agent = new nw::AutofillAgent(render_view);
+  page_click_tracker_.reset(new autofill::PageClickTracker(render_view, autofill_agent));
+  // PasswordAutofillAgent* password_autofill_agent =
+  //     new PasswordAutofillAgent(render_view);
+  // new AutofillAgent(render_view, password_autofill_agent);
 }
 
 void ShellContentRendererClient::DidCreateScriptContext(
@@ -318,14 +331,15 @@ void ShellContentRendererClient::InstallNodeSymbols(
 
         // Save node-webkit version
         "process.versions['node-webkit'] = '" NW_VERSION_STRING "';"
+        "process.versions['chromium'] = '" CHROME_VERSION "';"
     ));
     script->Run();
   }
 }
 
 // static
-v8::Handle<v8::Value> ShellContentRendererClient::ReportException(
-    const v8::Arguments& args) {
+void ShellContentRendererClient::ReportException(
+            const v8::FunctionCallbackInfo<v8::Value>&  args) {
   v8::HandleScope handle_scope;
 
   // Do nothing if user is listening to uncaughtException.
@@ -339,8 +353,10 @@ v8::Handle<v8::Value> ShellContentRendererClient::ReportException(
   v8::Local<v8::Array> listener_array = v8::Local<v8::Array>::Cast(ret);
 
   uint32_t length = listener_array->Length();
-  if (length > 1)
-    return v8::Undefined();
+  if (length > 1) {
+    args.GetReturnValue().Set(v8::Undefined());
+    return;
+  }
 
   // Print stacktrace.
   v8::Local<v8::String> stack_symbol = v8::String::New("stack");
@@ -353,14 +369,16 @@ v8::Handle<v8::Value> ShellContentRendererClient::ReportException(
     error = *v8::String::Utf8Value(exception);
 
   RenderView* render_view = GetCurrentRenderView();
-  if (!render_view)
-    return v8::Undefined();
+  if (!render_view) {
+    args.GetReturnValue().Set(v8::Undefined());
+    return;
+  }
 
   render_view->Send(new ShellViewHostMsg_UncaughtException(
       render_view->GetRoutingID(),
       error));
 
-  return v8::Undefined();
+  args.GetReturnValue().Set(v8::Undefined());
 }
 
 void ShellContentRendererClient::UninstallNodeSymbols(
