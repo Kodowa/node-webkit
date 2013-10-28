@@ -31,6 +31,7 @@
 #include "content/nw/src/net/app_protocol_handler.h"
 #include "content/nw/src/nw_protocol_handler.h"
 #include "content/nw/src/nw_shell.h"
+#include "content/nw/src/shell_content_browser_client.h"
 #include "net/cert/cert_verifier.h"
 #include "net/ssl/default_server_bound_cert_store.h"
 #include "net/dns/host_resolver.h"
@@ -53,6 +54,7 @@
 #include "net/url_request/url_request_context.h"
 #include "net/url_request/url_request_context_storage.h"
 #include "net/url_request/url_request_job_factory_impl.h"
+#include "ui/base/l10n/l10n_util.h"
 
 using base::MessageLoop;
 
@@ -108,7 +110,11 @@ net::URLRequestContext* ShellURLRequestContextGetter::GetURLRequestContext() {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
 
   if (!url_request_context_.get()) {
-    url_request_context_.reset(new net::URLRequestContext());
+    ShellContentBrowserClient* browser_client =
+      static_cast<ShellContentBrowserClient*>(
+          GetContentClient()->browser());
+
+  url_request_context_.reset(new net::URLRequestContext());
     network_delegate_.reset(new ShellNetworkDelegate);
     url_request_context_->set_network_delegate(network_delegate_.get());
     storage_.reset(
@@ -130,8 +136,16 @@ net::URLRequestContext* ShellURLRequestContextGetter::GetURLRequestContext() {
     storage_->set_server_bound_cert_service(new net::ServerBoundCertService(
         new net::DefaultServerBoundCertStore(NULL),
         base::WorkerPool::GetTaskRunner(true)));
+
+    std::string accept_lang = browser_client->GetApplicationLocale();
+    if (accept_lang.empty())
+      accept_lang = "en-us,en";
+    else
+      accept_lang.append(",en-us,en");
     storage_->set_http_user_agent_settings(
-        new net::StaticHttpUserAgentSettings("en-us,en", EmptyString()));
+         new net::StaticHttpUserAgentSettings(
+                net::HttpUtil::GenerateAcceptLanguageHeader(accept_lang),
+                EmptyString()));
 
     scoped_ptr<net::HostResolver> host_resolver(
         net::HostResolver::CreateDefaultResolver(NULL));
