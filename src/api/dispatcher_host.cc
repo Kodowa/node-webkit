@@ -41,18 +41,42 @@
 
 using content::WebContents;
 using content::ShellBrowserContext;
+using content::Shell;
 
-namespace api {
+namespace nwapi {
+
+IDMap<Base, IDMapOwnPointer> nwapi::DispatcherHost::objects_registry_;
+int nwapi::DispatcherHost::next_object_id_ = 1;
+static std::map<content::RenderViewHost*, DispatcherHost*> g_dispatcher_host_map;
 
 DispatcherHost::DispatcherHost(content::RenderViewHost* render_view_host)
     : content::RenderViewHostObserver(render_view_host) {
+  g_dispatcher_host_map[render_view_host] = this;
 }
 
 DispatcherHost::~DispatcherHost() {
+  g_dispatcher_host_map.erase(render_view_host());
+}
+
+DispatcherHost*
+FindDispatcherHost(content::RenderViewHost* render_view_host) {
+  std::map<content::RenderViewHost*, DispatcherHost*>::iterator it
+    = g_dispatcher_host_map.find(render_view_host);
+  if (it == g_dispatcher_host_map.end())
+    return NULL;
+  return it->second;
+}
+
+void DispatcherHost::ClearObjectRegistry() {
+  objects_registry_.Clear();
 }
 
 Base* DispatcherHost::GetApiObject(int id) {
   return objects_registry_.Lookup(id);
+}
+
+int DispatcherHost::AllocateId() {
+  return next_object_id_++;
 }
 
 void DispatcherHost::SendEvent(Base* object,
@@ -69,6 +93,7 @@ bool DispatcherHost::Send(IPC::Message* message) {
 bool DispatcherHost::OnMessageReceived(const IPC::Message& message) {
   bool handled = true;
   base::ThreadRestrictions::ScopedAllowIO allow_io;
+  base::ThreadRestrictions::ScopedAllowWait allow_wait;
   IPC_BEGIN_MESSAGE_MAP(DispatcherHost, message)
     IPC_MESSAGE_HANDLER(ShellViewHostMsg_Allocate_Object, OnAllocateObject)
     IPC_MESSAGE_HANDLER(ShellViewHostMsg_Deallocate_Object, OnDeallocateObject)
@@ -83,6 +108,7 @@ bool DispatcherHost::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ShellViewHostMsg_GetShellId, OnGetShellId);
     IPC_MESSAGE_HANDLER(ShellViewHostMsg_CreateShell, OnCreateShell);
     IPC_MESSAGE_HANDLER(ShellViewHostMsg_GrantUniversalPermissions, OnGrantUniversalPermissions);
+    IPC_MESSAGE_HANDLER(ShellViewHostMsg_AllocateId, OnAllocateId);
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
 
@@ -130,12 +156,13 @@ void DispatcherHost::OnCallObjectMethod(
              << " arguments:" << arguments;
 
   Base* object = GetApiObject(object_id);
-  CHECK(object) << "Unknown object: " << object_id
+  if (object)
+    object->Call(method, arguments);
+  else
+    DLOG(WARNING) << "Unknown object: " << object_id
              << " type:" << type
              << " method:" << method
              << " arguments:" << arguments;
-  if (object)
-    object->Call(method, arguments);
 }
 
 void DispatcherHost::OnCallObjectMethodSync(
@@ -150,7 +177,7 @@ void DispatcherHost::OnCallObjectMethodSync(
              << " arguments:" << arguments;
 
   Base* object = GetApiObject(object_id);
-  CHECK(object) << "Unknown object: " << object_id
+  LOG(WARNING) << "Unknown object: " << object_id
              << " type:" << type
              << " method:" << method
              << " arguments:" << arguments;
@@ -168,10 +195,10 @@ void DispatcherHost::OnCallStaticMethod(
              << " arguments:" << arguments;
 
   if (type == "Shell") {
-    api::Shell::Call(method, arguments);
+    nwapi::Shell::Call(method, arguments);
     return;
   } else if (type == "App") {
-    api::App::Call(method, arguments);
+    nwapi::App::Call(method, arguments);
     return;
   }
 
@@ -191,7 +218,7 @@ void DispatcherHost::OnCallStaticMethodSync(
   if (type == "App") {
     content::Shell* shell =
         content::Shell::FromRenderViewHost(render_view_host());
-    api::App::Call(shell, method, arguments, result);
+    nwapi::App::Call(shell, method, arguments, result);
     return;
   }
 
@@ -229,15 +256,26 @@ void DispatcherHost::OnCreateShell(const std::string& url,
   WebContents* web_contents = content::WebContentsImpl::CreateWithOpener(
       create_params,
       static_cast<content::WebContentsImpl*>(base_web_contents));
-  content::Shell::Create(base_web_contents,
-                         GURL(url),
-                         new_manifest.get(),
-                         web_contents);
+  content::Shell* new_shell =
+    content::Shell::Create(base_web_contents,
+                           GURL(url),
+                           new_manifest.get(),
+                           web_contents);
 
-  if (new_renderer)
+  if (new_renderer) {
     browser_context->set_pinning_renderer(true);
+    // since the new-instance shell is always bound
+    // there would be 'Close' event cannot reach dest
+    new_shell->set_force_close(true);
+  }
 
   *routing_id = web_contents->GetRoutingID();
+
+  int object_id = 0;
+  if (new_manifest->GetInteger("object_id", &object_id)) {
+    DispatcherHost* dhost = FindDispatcherHost(web_contents->GetRenderViewHost());
+    dhost->OnAllocateObject(object_id, "Window", *new_manifest.get());
+  }
 }
 
 void DispatcherHost::OnGrantUniversalPermissions(int *ret) {
@@ -250,4 +288,8 @@ void DispatcherHost::OnGrantUniversalPermissions(int *ret) {
     *ret = 0;
 }
 
-}  // namespace api
+void DispatcherHost::OnAllocateId(int * ret) {
+  *ret = AllocateId();
+}
+
+}  // namespace nwapi

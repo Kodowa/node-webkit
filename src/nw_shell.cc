@@ -44,6 +44,7 @@
 #include "content/public/common/renderer_preferences.h"
 #include "content/public/common/url_constants.h"
 #include "content/nw/src/api/api_messages.h"
+#include "content/nw/src/api/dispatcher_host.h"
 #include "content/nw/src/api/app/app.h"
 #include "content/nw/src/browser/browser_dialogs.h"
 #include "content/nw/src/browser/file_select_helper.h"
@@ -144,11 +145,12 @@ Shell* Shell::FromRenderViewHost(RenderViewHost* rvh) {
 
 Shell::Shell(WebContents* web_contents, base::DictionaryValue* manifest)
     :
-      is_devtools_(false),
-      force_close_(false),
-      id_(-1),
-      enable_nodejs_(true),
-      weak_ptr_factory_(this)
+  devtools_window_id_(0),
+  is_devtools_(false),
+  force_close_(false),
+  id_(-1),
+  enable_nodejs_(true),
+  weak_ptr_factory_(this)
 {
   // Register shell.
   registrar_.Add(this, NOTIFICATION_WEB_CONTENTS_TITLE_UPDATED,
@@ -182,6 +184,23 @@ Shell::~Shell() {
 
   if (is_devtools_ && devtools_owner_.get()) {
     devtools_owner_->SendEvent("devtools-closed");
+    nwapi::DispatcherHost* dhost = nwapi::FindDispatcherHost(devtools_owner_->web_contents_->GetRenderViewHost());
+    if (devtools_owner_->devtools_window_id_) {
+      dhost->OnDeallocateObject(devtools_owner_->devtools_window_id_);
+      devtools_owner_->devtools_window_id_ = 0;
+    }else if (id_) {
+      //FIXME: the ownership/ flow of window and shell destruction
+      //need to be cleared
+
+      // In linux, Shell destruction will be called immediately in
+      // CloseDevTools but in OSX it won't
+      dhost->OnDeallocateObject(id_);
+    }
+  }
+
+  if (!is_devtools_ && id_ > 0) {
+    nwapi::DispatcherHost* dhost = nwapi::FindDispatcherHost(web_contents_->GetRenderViewHost());
+    dhost->OnDeallocateObject(id_);
   }
 
   for (size_t i = 0; i < windows_.size(); ++i) {
@@ -195,11 +214,23 @@ Shell::~Shell() {
     }
   }
 
-  if (windows_.empty() && quit_message_loop_)
-    api::App::Quit(web_contents()->GetRenderProcessHost());
+  if (windows_.empty() && quit_message_loop_) {
+    // If Window object is not clearred here, the Window destructor
+    // will be called at exit and block the thread exiting on
+    // Notification registrar destruction
+    nwapi::DispatcherHost::ClearObjectRegistry();
+    nwapi::App::Quit(web_contents()->GetRenderProcessHost());
+  }
 }
 
 void Shell::SendEvent(const std::string& event, const std::string& arg1) {
+  base::ListValue args;
+  if (!arg1.empty())
+    args.AppendString(arg1);
+  SendEvent(event, args);
+}
+
+void Shell::SendEvent(const std::string& event, const base::ListValue& args) {
 
   if (id() < 0)
     return;
@@ -207,12 +238,14 @@ void Shell::SendEvent(const std::string& event, const std::string& arg1) {
   DVLOG(1) << "Shell::SendEvent " << event << " id():"
            << id() << " RoutingID: " << web_contents()->GetRoutingID();
 
-  base::ListValue args;
-  if (!arg1.empty())
-    args.AppendString(arg1);
+  WebContents* web_contents;
+  if (is_devtools_ && devtools_owner_.get())
+    web_contents = devtools_owner_->web_contents();
+  else
+    web_contents = this->web_contents();
 
-  web_contents()->GetRenderViewHost()->Send(new ShellViewMsg_Object_On_Event(
-      web_contents()->GetRoutingID(), id(), event, args));
+  web_contents->GetRenderViewHost()->Send(new ShellViewMsg_Object_On_Event(
+      web_contents->GetRoutingID(), id(), event, args));
 }
 
 bool Shell::ShouldCloseWindow() {
@@ -317,6 +350,20 @@ void Shell::CloseDevTools() {
     return;
   devtools_window_->window()->Close();
   devtools_window_.reset();
+  devtools_window_id_ = 0;
+}
+
+int Shell::WrapDevToolsWindow() {
+  if (devtools_window_id_)
+    return devtools_window_id_;
+  if (!devtools_window_)
+    return 0;
+  nwapi::DispatcherHost* dhost = nwapi::FindDispatcherHost(devtools_window_->web_contents_->GetRenderViewHost());
+  int object_id = dhost->AllocateId();
+  base::DictionaryValue manifest;
+  dhost->OnAllocateObject(object_id, "Window", manifest);
+  devtools_window_id_ = object_id;
+  return object_id;
 }
 
 void Shell::ShowDevTools(const char* jail_id, bool headless) {
@@ -349,7 +396,6 @@ void Shell::ShowDevTools(const char* jail_id, bool headless) {
   GURL url = delegate->devtools_http_handler()->GetFrontendURL(agent.get());
 
   SendEvent("devtools-opened", url.spec());
-
   if (headless)
     return;
 

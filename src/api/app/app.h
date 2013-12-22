@@ -34,8 +34,8 @@ class RenderProcessHost;
 class Shell;
 }
 
-namespace api {
-  
+namespace nwapi {
+
 class App {
  public:
   static void Call(const std::string& method,
@@ -60,13 +60,13 @@ class App {
   static void EmitReopenEvent();
 
   static void ClearCache(content::RenderProcessHost* render_view_host);
+
  private:
   App();
-
   DISALLOW_COPY_AND_ASSIGN(App);
 };
 
-}  // namespace api
+}  // namespace nwapi
 
 #endif  // CONTENT_NW_SRC_API_APP_APP_H_
 

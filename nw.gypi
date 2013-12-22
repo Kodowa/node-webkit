@@ -5,6 +5,11 @@
 {
   'variables': {
     'nw_product_name': 'node-webkit',
+    'conditions': [
+      ['OS=="linux"', {
+       'linux_dump_symbols%': 1,
+      }],
+    ],
   },
   'targets': [
     {
@@ -624,6 +629,11 @@
       'msvs_settings': {
         'VCLinkerTool': {
           'SubSystem': '2',  # Set /SUBSYSTEM:WINDOWS
+        },
+	'VCManifestTool': {
+          'AdditionalManifestFiles': [
+            '$(ProjectDir)\\nw\\src\\nw.exe.manifest',
+          ],
         },
       },
       'conditions': [

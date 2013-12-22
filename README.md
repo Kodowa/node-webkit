@@ -7,7 +7,9 @@ native applications with all Web technologies.
 
 It's created and developed in the Intel Open Source Technology Center.
 
-[Introduction to node-webkit (slides)](https://speakerdeck.com/u/zcbenz/p/node-webkit-app-runtime-based-on-chromium-and-node-dot-js).
+[Introduction to node-webkit (slides)](https://speakerdeck.com/u/zcbenz/p/node-webkit-app-runtime-based-on-chromium-and-node-dot-js)   
+[Creating Desktop Applications With node-webkit](http://strongloop.com/strongblog/creating-desktop-applications-with-node-webkit/)     
+[WebApp to DesktopApp with node-webkit (slides)](http://oldgeeksguide.github.io/presentations/html5devconf2013/wtod.html)
 
 ## Features
 
@@ -18,21 +20,13 @@ It's created and developed in the Intel Open Source Technology Center.
 * Available on Linux, Mac OSX and Windows
 
 ## Downloads
-[v0.8.0-rc1 release notes](https://groups.google.com/d/msg/node-webkit/wSFOm6zCadQ/PyNfaWx3jt0J)
+[v0.8.3 release notes](https://groups.google.com/d/msg/node-webkit/ywebTZOA_cM/Aqv180nFYIcJ)
 
-Prebuilt binaries (v0.8.0-rc1 - Oct 21, 2013):
+Prebuilt binaries (v0.8.3 - Dec 20, 2013):
 
-* Linux: [32bit](https://s3.amazonaws.com/node-webkit/v0.8.0-rc1/node-webkit-v0.8.0-rc1-linux-ia32.tar.gz) / [64bit] (https://s3.amazonaws.com/node-webkit/v0.8.0-rc1/node-webkit-v0.8.0-rc1-linux-x64.tar.gz)
-* Windows: [win32](https://s3.amazonaws.com/node-webkit/v0.8.0-rc1/node-webkit-v0.8.0-rc1-win-ia32.zip)
-* Mac: [32bit, 10.7+](https://s3.amazonaws.com/node-webkit/v0.8.0-rc1/node-webkit-v0.8.0-rc1-osx-ia32.zip)
-
-[v0.7.5 release notes](https://groups.google.com/d/msg/node-webkit/4VBQuHO2H0c/UAdc2O1ZiBwJ)
-
-Prebuilt binaries (v0.7.5 - Sep 18, 2013):
-
-* Linux: [32bit](https://s3.amazonaws.com/node-webkit/v0.7.5/node-webkit-v0.7.5-linux-ia32.tar.gz) / [64bit] (https://s3.amazonaws.com/node-webkit/v0.7.5/node-webkit-v0.7.5-linux-x64.tar.gz)
-* Windows: [win32](https://s3.amazonaws.com/node-webkit/v0.7.5/node-webkit-v0.7.5-win-ia32.zip)
-* Mac: [32bit, 10.7+](https://s3.amazonaws.com/node-webkit/v0.7.5/node-webkit-v0.7.5-osx-ia32.zip)
+* Linux: [32bit](https://s3.amazonaws.com/node-webkit/v0.8.3/node-webkit-v0.8.3-linux-ia32.tar.gz) / [64bit] (https://s3.amazonaws.com/node-webkit/v0.8.3/node-webkit-v0.8.3-linux-x64.tar.gz)
+* Windows: [win32](https://s3.amazonaws.com/node-webkit/v0.8.3/node-webkit-v0.8.3-win-ia32.zip)
+* Mac: [32bit, 10.7+](https://s3.amazonaws.com/node-webkit/v0.8.3/node-webkit-v0.8.3-osx-ia32.zip)
 
 [Looking for older versions?](https://github.com/rogerwang/node-webkit/wiki/Downloads-of-old-versions)
 
@@ -103,6 +97,8 @@ And our [Wiki](https://github.com/rogerwang/node-webkit/wiki) for much more.
 We use the [node-webkit group](http://groups.google.com/group/node-webkit) as
 our mailing list. Subscribe via [node-webkit+subscribe@googlegroups.com](mailto:node-webkit+subscribe@googlegroups.com).
 Issues are being tracked here on GitHub.
+
+You can chat with us on IRC in the ##node-webkit channel on irc.freenode.net  
 
 ## License
 

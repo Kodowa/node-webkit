@@ -102,6 +102,7 @@ class Shell : public WebContentsDelegate,
   bool devToolsOpen() { return devtools_window_.get() != NULL; }
   // Send an event to renderer.
   void SendEvent(const std::string& event, const std::string& arg1 = "");
+  void SendEvent(const std::string& event, const base::ListValue& args);
 
   // Decide whether we should close the window.
   bool ShouldCloseWindow();
@@ -112,6 +113,7 @@ class Shell : public WebContentsDelegate,
   void PrintCriticalError(const std::string& title,
                           const std::string& content);
 
+  int WrapDevToolsWindow();
   // Returns the currently open windows.
   static std::vector<Shell*>& windows() { return windows_; }
 
@@ -198,6 +200,8 @@ class Shell : public WebContentsDelegate,
   // Weak potiner to devtools window.
   base::WeakPtr<Shell> devtools_window_;
   base::WeakPtr<Shell> devtools_owner_;
+
+  int devtools_window_id_;
 #if 0
   ShellDevToolsFrontend* devtools_frontend_;
 #endif
