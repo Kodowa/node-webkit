@@ -98,6 +98,9 @@ const char kmUserAgent[] = "user-agent";
 const char kmRemotePages[] = "node-remote";
 
 const char kmNewInstance[] = "new-instance";
+const char kmInjectJSDocStart[]  = "inject-js-start";
+const char kmInjectJSDocEnd[]  = "inject-js-end";
+const char kmInjectCSS[] = "inject-css";
 
 #if defined(OS_WIN)
 // Enable conversion from vector to raster for any page.

@@ -57,6 +57,8 @@
 #include "content/nw/src/shell_browser_context.h"
 #include "content/nw/src/shell_browser_main_parts.h"
 #include "content/nw/src/shell_content_browser_client.h"
+#include "content/nw/src/shell_devtools_frontend.h"
+
 #include "grit/nw_resources.h"
 #include "net/base/escape.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -144,7 +146,7 @@ Shell* Shell::FromRenderViewHost(RenderViewHost* rvh) {
 }
 
 Shell::Shell(WebContents* web_contents, base::DictionaryValue* manifest)
-    :
+  : content::WebContentsObserver(web_contents),
   devtools_window_id_(0),
   is_devtools_(false),
   force_close_(false),
@@ -393,11 +395,13 @@ void Shell::ShowDevTools(const char* jail_id, bool headless) {
 
   ShellDevToolsDelegate* delegate =
       browser_client->shell_browser_main_parts()->devtools_delegate();
-  GURL url = delegate->devtools_http_handler()->GetFrontendURL(agent.get());
+  GURL url = delegate->devtools_http_handler()->GetFrontendURL();
 
   SendEvent("devtools-opened", url.spec());
-  if (headless)
+  if (headless) {
+    // FIXME: DevToolsFrontendHost
     return;
+  }
 
   // Use our minimum set manifest
   base::DictionaryValue manifest;
@@ -416,6 +420,10 @@ void Shell::ShowDevTools(const char* jail_id, bool headless) {
   WebContents::CreateParams create_params(web_contents()->GetBrowserContext(), NULL);
   WebContents* web_contents = WebContents::Create(create_params);
   Shell* shell = new Shell(web_contents, &manifest);
+
+  new ShellDevToolsFrontend(
+      shell,
+      DevToolsAgentHost::GetOrCreateFor(inspected_rvh).get());
 
   int rh_id = shell->web_contents_->GetRenderProcessHost()->GetID();
   ChildProcessSecurityPolicyImpl::GetInstance()->GrantScheme(rh_id, chrome::kFileScheme);
@@ -533,6 +541,10 @@ void Shell::WebContentsCreated(WebContents* source_contents,
 
   // don't pass the url on window.open case
   Shell::Create(source_contents, GURL::EmptyGURL(), manifest.get(), new_contents);
+
+  // in Chromium 32 RenderViewCreated will not be called so the case
+  // should be handled here
+  new nwapi::DispatcherHost(new_contents->GetRenderViewHost());
 }
 
 #if defined(OS_WIN)
@@ -624,6 +636,11 @@ GURL Shell::OverrideDOMStorageOrigin(const GURL& origin) {
   if (!is_devtools())
     return origin;
   return GURL("devtools://");
+}
+
+void Shell::RenderViewCreated(RenderViewHost* render_view_host) {
+  //FIXME: handle removal
+  new nwapi::DispatcherHost(render_view_host);
 }
 
 }  // namespace content
